@@ -1,30 +1,122 @@
 ---
-title: "Final Project"
-author: "bydmitrii"
-date: "14/12/2017"
-output: html_document
+title: "IODS final project"
+date: "14.12.2017"
+author: "Dmitrii Bychkov \n dmitrii.bychkov@helsinki.fi"
+output:
+  html_document:
+    author: "Dmitrii Bychkov"
+    theme: paper
+    toc: true
+    highlight: tango
+    toc_depth: 2
+    fig_caption: true
+    fig_width: 6
+    fig_height: 4
+    code_folding: hide
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r echo=F, warning=F, message=F}
+library(dplyr)
+library(reshape)
+library(ggplot2)
+library(GGally)
+library(tidyr)
+library(corrplot)
+library(knitr)
+library(arm)
+library(MASS)
+library(sjPlot)
+library(psych)
+library(xtable)
+library(stargazer)
+library(FactoMineR)
+library(factoextra)
 ```
 
-## R Markdown
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r echo=F, warning=F, message=F}
+data("hobbies")
+hobbies.active <- hobbies[sample(1:nrow(hobbies), 15, replace=FALSE), 1:18]
 ```
 
-## Including Plots
+# Hobbies
 
-You can also embed plots, for example:
+## Background
+We all have different hobbies and what kind of activity we prefer at our leisure time depends on many factors such as age, gender, profession etc. Identifying associations between hobbies and sociodemographic attributes of individuals is an interesting question in social sciences. Using a dataset collected on 8403 individuals in France we can try to perform explanatory analysis to address this question. Multiple Correspondance Analysis (MCA) is one of the most common and established techniques that allows to analyse datasets with catecorical variables (factors). The approach is similar to that of the PCA. In this exersice I will try to apply MCA to project multidimentional data onto a 2D plane to study similarities among individual hobbie-profiles and how those are related to age or gender.
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+
+## Material and methods
+
+To perform MCA I chose to use the results of a survey taken in 2003 in 8403 people age 18 and over. The INSEE institute run a survey on how people construct their identity. Part of the survey looked into the leisure habits of the French. The survey dataset consists of 22 variables. 
+
+#### Short description of the variables 
+
+* Hobbies (18):
+    + Reading, Listening to music, Cinema, Shows, Exhibitions, Computer, Sports, Walking, Travel, Playing a musical instrument, Collecting, Voluntary work, Home improvement, Gardering, Knitting, Cooking, Fishing, Number of hours of TV per da on average.
+* Sociodemographic (4):
+    + sex; gender; profession; merital status.
+
+#### MCA - Multiple Correspondence Analysis
+The Multiple correspondence analysis (MCA) is an extension of the simple correspondence analysis for summarizing and visualizing a data table containing more than two categorical variables. It can also be seen as a generalization of principal component analysis when the variables to be analyzed are categorical instead of quantitative. MCA is generally used to analyse a data set from survey. The goal is to identify: a) A group of individuals with similar profile in their answers to the questions; b) The associations between variable categories.
+
+## Results 
+Like in any Principal Component method, MCA aims to project original space to a smaller dimentional space, i.e. look for the axis maximizing the inertia and orthogonal to previous axes. In order to find the best 2D representation of the data we first use 18 variables that correspond to different activities as *active*, meaning that those will be used to calculate the distance between individuals. The rest will be used to help interprete the results. We start by looing at the decreasing values of the inertia (percentage of explined variances) by each MCA dimensions:
+
+```{r,fig.height=3.5,fig.width=6}
+res.mca <- MCA(hobbies.active, graph = FALSE)
+fviz_screeplot(MCA(hobbies[,1:18], graph = FALSE), addlabels = TRUE, ylim = c(0, 23), main='')
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+*Figure 1. Inertia by MCA dimentions*
+
+The barplot on Figure 1 shows that percentage of inertia associated with the first two dimentions is almost 24%. Obviously, two dimentions is just not enough to capture the diversity present in the data. However, in this exercise we will try to interprete the results based on only the first two principal components. 
+
+Typically, in this kind of setting we are interested in the general form of point-cloud of individuals also known as biplot.
+
+```{r,fig.height=5.5,fig.width=6}
+fviz_mca_biplot(res.mca, 
+               repel = TRUE, # Avoid text overlapping (slow if many point)
+               ggtheme = theme_minimal())
+```
+
+*Figure 3. Inertia by MCA dimentions*
+
+
+The plot above shows a global pattern within the data. Rows (individuals) are represented by blue points and columns (variable categories) by red triangles. The distance between any row points or column points gives a measure of their similarity (or dissimilarity). Row points with similar profile are closed on the factor map. The same holds true for column points.
+
+
+We can also visualize the correlation between variables and MCA principal components (Figure 3)
+```{r,fig.height=5.5,fig.width=6}
+fviz_mca_var(res.mca, choice = "mca.cor", 
+            repel = TRUE, # Avoid text overlapping (slow)
+            ggtheme = theme_minimal())
+```
+
+*Figure 3. Correlation plot*
+
+The plot above shows that TV-watching is the most correlated variable with 2nd principle dimention. Exhibitions, Reading and Cooking appear to be the most correlated with dimention 1.
+
+
+Supplementary variables can be used for interpretation of the biplot by coloring individual groups using the levels of certain qualitative (or quantitative) variables. Here I tried to visualize how hobbies differ with age (Figure 4).
+```{r,fig.height=5.5,fig.width=6}
+res.mca <- MCA(hobbies[,1:22],
+               ind.sup = sample(1:nrow(hobbies), 35, replace=FALSE), 
+               quanti.sup = NULL, quali.sup=19:22, graph=FALSE)
+
+fviz_mca_ind(res.mca, 
+             label = "none", # hide individual labels
+             habillage = "Age", # color by groups 
+             palette = c("#edf8b1", "#c7e9b4", "#7fcdbb","#41b6c4", "#1d91c0", "#225ea8", "#253494","#081d58"),
+             addEllipses = TRUE, #ellipse.type = "confidence",
+             ggtheme = theme_minimal()) 
+```
+
+*Figure 4. Biplot for two different goups of individuals*
+
+## Conclusion and discussion
+
+MCA allows to reveal the most important variables that contribute the most in explaining the variations in the dataset. In the hobbies dataset I could not identify any explicit clusters of the individuals, however I observed that leisure activity patterns vary with age and gander. I did not have a chance to run more sophisticated analysis with MCA due to time constraints but I would like to get back to the method to develop better understanding of the computational steps. Done for today though :)
+
+
+
+
